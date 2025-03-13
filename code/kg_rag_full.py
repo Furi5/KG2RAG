@@ -1,4 +1,3 @@
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import json
 import os
 from tqdm import tqdm
@@ -12,14 +11,14 @@ from llama_index.core.retrievers import VectorIndexRetriever
 from llama_index.core.query_engine import RetrieverQueryEngine
 from llama_index.core.response_synthesizers import ResponseMode
 from llama_index.embeddings.ollama import OllamaEmbedding
-from util.kg_post_processor import NaivePostprocessor,KGRetrievePostProcessor,ngram_overlap,GraphFilterPostProcessor,KGIntraInterPostProcessor
+from util.kg_post_processor import NaivePostprocessor,KGRetrievePostProcessor,ngram_overlap,GraphFilterPostProcessor
 from util.kg_response_synthesizer import get_response_synthesizer
 
 def kg_rag_parallel(data, doc2kg, top_k=5, workers=4,persist_dir=None,reranker='../model/bge-reranker-large'):
     prediction = {'answer': {}, 'sp': {}}
 
-    doc_chunks = []
-    chunks_index = dict()
+    doc_chunks = [] # 文档块
+    chunks_index = dict()  # 实体字典
     ents = set()
     for sample in data:
         for ctx in sample['context']:
@@ -38,7 +37,7 @@ def kg_rag_parallel(data, doc2kg, top_k=5, workers=4,persist_dir=None,reranker='
         index = load_index_from_storage(sc)
     else:
         print('Create and save index to persist dir')
-        index = VectorStoreIndex(doc_chunks,show_progress=True)
+        index = VectorStoreIndex(doc_chunks,show_progress=True) # 存chunk 的 index
         if persist_dir is not None:
             os.makedirs(persist_dir,exist_ok=True)
             index.storage_context.persist(persist_dir=persist_dir)
@@ -77,14 +76,23 @@ def main(args):
     data_path = args.data_path
     with open(data_path,'r',encoding='utf-8') as f:
         data = json.load(f)
-
+    # 实体
     ents = set()
-    for sample in data:
+    new_data =[]
+    for i, sample in enumerate(data):
         for ctx in sample['context']:
             ents.add(ctx[0])
+        # new_data.append(sample)
 
+    # with open('/home/jovyan/my_code/KG2RAG/data/test_hotpo/hotpo.json','w',encoding='utf-8') as f:
+    #     json.dump(new_data,f)
+    
+    
+    # data = new_data     
+    # kg_dir 知识图谱的位置
     kg_dir = args.kg_dir
     doc2kg = dict()
+    # doc2kg 是一个字典，key是实体，value是对应的多个triplets
     print(f'\n{"-"*20}\nLoading KGs')
     for ent in tqdm(ents):
         subkg_path = os.path.join(kg_dir,f'{ent.replace("/","_")}.json')
@@ -105,17 +113,20 @@ def main(args):
                         del subkg[seq]
                 if len(subkg.keys())>0:
                     doc2kg[ent] = subkg
-
+    
+    # doc2kg是整个图谱，根据 ent为key，value为对应的triplets
     model_name = args.model_name
     print('Init Ollama model')
-    Settings.llm = Ollama(model=model_name,request_timeout=200)
+    Settings.llm = Ollama(model=model_name,request_timeout=200,base_url='http://127.0.0.1:11434')
     embed_model_name = args.embed_model_name
     print('Init Ollama embedding')
-    Settings.embed_model = OllamaEmbedding(model_name=embed_model_name)
+    Settings.embed_model = OllamaEmbedding(model_name=embed_model_name, base_url='http://127.0.0.1:11434')
     top_k = args.top_k
     workers = args.num_workers
     persist_dir = args.persist_dir
     reranker = args.reranker
+    
+    # 执行 rag 的主函数
     prediction = kg_rag_parallel(data,doc2kg,top_k=top_k,workers=workers,persist_dir=persist_dir,reranker=reranker)
 
     result_path = args.result_path
@@ -126,10 +137,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
 
     # hotpot full
-    parser.add_argument('--data_path',type=str,default='../data/hotpotqa/hotpot_dev_distractor_v1.json',help='Path to the data file')
-    parser.add_argument('--result_path',type=str,default='../output/hotpot/hotpot_dev_distractor_v1_full.json',help='Path to the result file')
-    parser.add_argument('--kg_dir',type=str,default='../data/hotpotqa/kgs/extract_subkgs')
-    parser.add_argument('--persist_dir',type=str,default='../data/ollama_index/hotpotqa',help='Directory to store the index')
+    # data_path 是原始数据集的路径
+    parser.add_argument('--data_path',type=str,default='/home/jovyan/my_code/KG2RAG/test_hotpo/hotpo.json',help='Path to the data file')
+    parser.add_argument('--result_path',type=str,default='/home/jovyan/my_code/KG2RAG/output/hotpot_test_v1_full.json',help='Path to the result file')
+    parser.add_argument('--kg_dir',type=str,default='/home/jovyan/my_code/KG2RAG/test_hotpo/kgs/extract_subkgs')
+    parser.add_argument('--persist_dir',type=str,default='/home/jovyan/my_code/KG2RAG/test_hotpo/ollama_index/hotpotqa',help='Directory to store the index')
 
     # # pu-hotpot full
     # parser.add_argument('--data_path',type=str,default='../data/pu-hotpotqa/hotpot_dev_distractor_v1.json',help='Path to the data file')
@@ -141,6 +153,6 @@ if __name__ == '__main__':
     parser.add_argument('--embed_model_name',type=str,default='mxbai-embed-large',help='Ollama embedding model name for indexing')
     parser.add_argument('--top_k',type=int,default=10,help='Top k similar documents')
     parser.add_argument('--num_workers',type=int,default=4,help='Number of workers for parallel processing')
-    parser.add_argument('--reranker',type=str,default='../model/bge-reranker-large',help='Path of the reranker model')
+    parser.add_argument('--reranker',type=str,default='/home/jovyan/my_code/KG2RAG/bge-reranker-large',help='Path of the reranker model')
     args = parser.parse_args()
     main(args)

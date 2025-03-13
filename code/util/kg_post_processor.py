@@ -1,6 +1,3 @@
-import random
-import re
-import time
 import networkx as nx
 
 from typing import List,Dict,Optional,Set
@@ -53,14 +50,18 @@ class NaivePostprocessor(BaseNodePostprocessor):
         sorted_nodes = []
         for i,node in enumerate(nodes):
             node_id = node.node.id_
-            if self.dataset=='hotpotqa':
-                ent,seq_str = node_id.split('##')
-                idx_seq_str = seq_str
-                ctx_seq = int(seq_str)
-            elif self.dataset=='musique':
-                idx_str,ent,seq_str = node_id.split('##')
-                idx_seq_str = f'{idx_str}##{seq_str}'
-                ctx_seq = i
+            ent = node_id
+            seq_str = node_id
+            idx_seq_str =  seq_str
+            ctx_seq = i
+            # if self.dataset=='hotpotqa':
+            #     ent,seq_str = node_id.split('##')
+            #     idx_seq_str = seq_str
+            #     ctx_seq = int(seq_str)
+            # elif self.dataset=='musique':
+            #     idx_str,ent,seq_str = node_id.split('##')
+            #     idx_seq_str = f'{idx_str}##{seq_str}'
+            #     ctx_seq = i
             if ent not in entity_order:
                 entity_order[ent] = len(entity_order)
             sorted_nodes.append((ent,ctx_seq,node))
@@ -69,17 +70,19 @@ class NaivePostprocessor(BaseNodePostprocessor):
 
         prev_ent = ''
         for i in range(0,len(sorted_nodes)):
-            if self.dataset=='hotpotqa':
-                temp_ent = sorted_nodes[i].node.id_.split('##')[0]
-            elif self.dataset=='musique':
-                temp_ent = sorted_nodes[i].node.id_.split('##')[1]
+            temp_ent = sorted_nodes[i].node.id_
+            # if self.dataset=='hotpotqa':
+            #     temp_ent = sorted_nodes[i].node.id_.split('##')[0]
+            # elif self.dataset=='musique':
+            #     temp_ent = sorted_nodes[i].node.id_.split('##')[1]
             if (prev_ent == temp_ent):
                 sorted_nodes[i].node.text = sorted_nodes[i].node.text[len(temp_ent+': '):]
             if i<len(sorted_nodes)-1:
-                if self.dataset=='hotpotqa':
-                    next_ent = sorted_nodes[i+1].node.id_.split('##')[0]
-                elif self.dataset=='musique':
-                    next_ent = sorted_nodes[i+1].node.id_.split('##')[1]
+                next_ent = sorted_nodes[i+1].node.id_
+                # if self.dataset=='hotpotqa':
+                #     next_ent = sorted_nodes[i+1].node.id_.split('##')[0]
+                # elif self.dataset=='musique':
+                #     next_ent = sorted_nodes[i+1].node.id_.split('##')[1]
                 if next_ent!=temp_ent:
                     sorted_nodes[i].node.text += '\n'
             prev_ent = temp_ent
@@ -93,7 +96,7 @@ class KGRetrievePostProcessor(BaseNodePostprocessor):
     dataset: str = Field
     ents: Set[str] = Field
     doc2kg: Dict[str,Dict[str,List[List[str]]]] = Field
-    chunks_index: Dict[str,Dict[str,str]] = Field
+    chunks_index: Dict[str,str] = Field
 
     @classmethod
     def class_name(cls) -> str:
@@ -122,10 +125,13 @@ class KGRetrievePostProcessor(BaseNodePostprocessor):
             node_id = node.node.id_
             retrieved_ids.add(node_id)
             textid2score[node_id] = node.score
-            if self.dataset=='hotpotqa':
-                entity,seq_str = node_id.split('##')
-            elif self.dataset=='musique':
-                idx_str,entity,seq_str = node_id.split('##')
+            entity = node_id
+            seq_str = node_id
+            idx_str = node_id
+            # if self.dataset=='hotpotqa':
+            #     entity,seq_str = node_id.split('##')
+            # elif self.dataset=='musique':
+            #     idx_str,entity,seq_str = node_id.split('##')
 
             if (i<(top_k//2)) and (entity in retrieved_ents):
                 highly_related_ents.add(entity)
@@ -144,12 +150,15 @@ class KGRetrievePostProcessor(BaseNodePostprocessor):
         additional_ents = set()
         for node in nodes:
             node_id = node.node.id_
-            if self.dataset=='hotpotqa':
-                entity,seq_str = node_id.split('##')
-                idx_seq_str = seq_str
-            elif self.dataset=='musique':
-                idx_str,entity,seq_str = node_id.split('##')
-                idx_seq_str = f'{idx_str}##{seq_str}'
+            entity = node_id
+            seq_str = node_id
+            idx_seq_str = node_id
+            # if self.dataset=='hotpotqa':
+            #     entity,seq_str = node_id.split('##')
+            #     idx_seq_str = seq_str
+            # elif self.dataset=='musique':
+            #     idx_str,entity,seq_str = node_id.split('##')
+            #     idx_seq_str = f'{idx_str}##{seq_str}'
             if (entity not in self.doc2kg) or (idx_seq_str not in self.doc2kg[entity]):
                 continue
             for triplet in self.doc2kg[entity][idx_seq_str]:
@@ -183,11 +192,12 @@ class KGRetrievePostProcessor(BaseNodePostprocessor):
                 for idx_seq_str in self.doc2kg[ent]:
                     if len(self.doc2kg[ent][idx_seq_str])==0:
                         continue
-                    if self.dataset=='hotpotqa':
-                        ctx_id = f'{ent}##{idx_seq_str}'
-                    elif self.dataset=='musique':
-                        idx_str,seq_str = idx_seq_str.split('##')
-                        ctx_id = f'{idx_str}##{ent}##{seq_str}'
+                    ctx_id = f'{ent}##{idx_seq_str}'
+                    # if self.dataset=='hotpotqa':
+                    #     ctx_id = f'{ent}##{idx_seq_str}'
+                    # elif self.dataset=='musique':
+                    #     idx_str,seq_str = idx_seq_str.split('##')
+                    #     ctx_id = f'{idx_str}##{ent}##{seq_str}'
                     if ctx_id in retrieved_ids:
                         continue
                     
@@ -218,11 +228,12 @@ class KGRetrievePostProcessor(BaseNodePostprocessor):
             if (ent not in self.chunks_index) or (len(self.chunks_index[ent])==0) or (ent not in self.doc2kg):
                 continue
             for idx_seq_str in self.chunks_index[ent]:
-                if self.dataset=='hotpotqa':
-                    ctx_id = f'{ent}##{idx_seq_str}'
-                elif self.dataset=='musique':
-                    idx_str,seq_str = idx_seq_str.split('##')
-                    ctx_id = f'{idx_str}##{ent}##{seq_str}'
+                ctx_id = f'{ent}##{idx_seq_str}'
+                # if self.dataset=='hotpotqa':
+                #     ctx_id = f'{ent}##{idx_seq_str}'
+                # elif self.dataset=='musique':
+                #     idx_str,seq_str = idx_seq_str.split('##')
+                #     ctx_id = f'{idx_str}##{ent}##{seq_str}'
                 if ctx_id in retrieved_ids:
                     continue
                 additional_ids.add(ctx_id)
@@ -232,12 +243,15 @@ class KGRetrievePostProcessor(BaseNodePostprocessor):
 
         added_nodes = []
         for ctx_id in additional_ids:
-            if self.dataset=='hotpotqa':
-                ent,seq_str = ctx_id.split('##')
-                idx_seq_str = seq_str
-            elif self.dataset=='musique':
-                idx_str,ent,seq_str = ctx_id.split('##')
-                idx_seq_str = f'{idx_str}##{seq_str}'
+            ent = ctx_id
+            seq_str = ctx_id
+            idx_seq_str = seq_str
+            # if self.dataset=='hotpotqa':
+            #     ent,seq_str = ctx_id.split('##')
+            #     idx_seq_str = seq_str
+            # elif self.dataset=='musique':
+            #     idx_str,ent,seq_str = ctx_id.split('##')
+            #     idx_seq_str = f'{idx_str}##{seq_str}'
             if ent in self.chunks_index:
                 if idx_seq_str in self.chunks_index[ent]:
                     ctx_text = self.chunks_index[ent][idx_seq_str]
@@ -257,7 +271,7 @@ class GraphFilterPostProcessor(BaseNodePostprocessor):
     use_tpt: bool = Field
     ents: Set[str] = Field
     doc2kg: Dict[str,Dict[str,List[List[str]]]] = Field
-    chunks_index: Dict[str,Dict[str,str]] = Field
+    chunks_index: Dict[str,str] = Field
     reranker: FlagReranker = Field
 
     @classmethod
@@ -276,19 +290,24 @@ class GraphFilterPostProcessor(BaseNodePostprocessor):
         g = nx.MultiGraph()
 
         for node in nodes:
-            if self.dataset=='hotpotqa':
-                ent,seq_str = node.node.id_.split('##')
-            elif self.dataset=='musique':
-                idx_str,ent,seq_str = node.node.id_.split('##')
+            ent = node.node.id_
+            seq_str= node.node.id_
+            # if self.dataset=='hotpotqa':
+            #     ent,seq_str = node.node.id_.split('##')
+            # elif self.dataset=='musique':
+            #     idx_str,ent,seq_str = node.node.id_.split('##')
             ents.add(ent)
 
         for node in nodes:
-            if self.dataset=='hotpotqa':
-                ent,seq_str = node.node.id_.split('##')
-                idx_seq_str = seq_str
-            elif self.dataset=='musique':
-                idx_str,ent,seq_str = node.node.id_.split('##')
-                idx_seq_str = f'{idx_str}##{seq_str}'
+            ent = node.node.id_
+            seq_str = node.node.id_
+            idx_seq_str = node.node.id_
+            # if self.dataset=='hotpotqa':
+            #     ent,seq_str = node.node.id_.split('##')
+            #     idx_seq_str = seq_str
+            # elif self.dataset=='musique':
+            #     idx_str,ent,seq_str = node.node.id_.split('##')
+            #     idx_seq_str = f'{idx_str}##{seq_str}'
             if (ent not in self.doc2kg) or (idx_seq_str not in self.doc2kg[ent]) or (len(self.doc2kg[ent][idx_seq_str])==0):
                 continue
             for triplet in self.doc2kg[ent][idx_seq_str]:
@@ -315,20 +334,23 @@ class GraphFilterPostProcessor(BaseNodePostprocessor):
                 mentioned_rels.add(rel)
 
         for node in nodes:
-            if self.dataset=='hotpotqa':
-                ent,seq_str = node.node.id_.split('##')
-                idx_seq_str = seq_str
-            elif self.dataset=='musique':
-                idx_str,ent,seq_str = node.node.id_.split('##')
-                idx_seq_str = f'{idx_str}##{seq_str}'
+            ent = node.node.id_
+            seq_str = node.node.id_
+            idx_seq_str = node.node.id_
+            # if self.dataset=='hotpotqa':
+            #     ent,seq_str = node.node.id_.split('##')
+            #     idx_seq_str = seq_str
+            # elif self.dataset=='musique':
+            #     idx_str,ent,seq_str = node.node.id_.split('##')
+            #     idx_seq_str = f'{idx_str}##{seq_str}'
             if (ent not in self.doc2kg) or (idx_seq_str not in self.doc2kg[ent]) or (len(self.doc2kg[ent][idx_seq_str])==0):
                 continue
             for triplet in self.doc2kg[ent][idx_seq_str]:
                 h,r,t = triplet
                 triplet = [h,r,t]
-                if (h in mentioned_ents) and (r in mentioned_rels) and (not t in mentioned_ents):
+                if (h in mentioned_ents) and (r in mentioned_rels) and (t not in mentioned_ents):
                     mentioned_ents.add(t)
-                if (t in mentioned_ents) and (r in mentioned_rels) and (not h in mentioned_ents):
+                if (t in mentioned_ents) and (r in mentioned_rels) and (h not in mentioned_ents):
                     mentioned_ents.add(h)
 
         mentioned_ents_list = list(mentioned_ents)
@@ -388,12 +410,15 @@ class GraphFilterPostProcessor(BaseNodePostprocessor):
             ctx_str = ''
             tpt_str = ''
             for cand_id in cand_ids_list:
-                if self.dataset=='hotpotqa':
-                    cand_ent,seq_str = cand_id.split('##')
-                    idx_seq_str = seq_str
-                elif self.dataset=='musique':
-                    idx_str,cand_ent,seq_str = cand_id.split('##')
-                    idx_seq_str = f'{idx_str}##{seq_str}'
+                cand_ent = cand_id
+                seq_str = cand_id
+                idx_seq_str = cand_id
+                # if self.dataset=='hotpotqa':
+                #     cand_ent,seq_str = cand_id.split('##')
+                #     idx_seq_str = seq_str
+                # elif self.dataset=='musique':
+                #     idx_str,cand_ent,seq_str = cand_id.split('##')
+                #     idx_seq_str = f'{idx_str}##{seq_str}'
                 ctx_str += self.chunks_index[cand_ent][idx_seq_str]
                 if (self.use_tpt) and (cand_ent in self.doc2kg) and (idx_seq_str in self.doc2kg[cand_ent]) and (len(self.doc2kg[cand_ent][idx_seq_str])>0):
                     tpt_str += ', '.join([f'{h} has/is {r} {t}' for h,r,t in self.doc2kg[cand_ent][idx_seq_str][:min(len(self.doc2kg[cand_ent][idx_seq_str]),3)]])

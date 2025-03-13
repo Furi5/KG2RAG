@@ -28,13 +28,17 @@ def extract_triplets(llm, ctx):
     triplets = [[h,r,t] for (h,r,t) in triplets]
     return triplets
 
-data_path = '../../data/hotpotqa/hotpot_dev_distractor_v1.json'
+# data_path = '../../data/hotpotqa/hotpot_dev_distractor_v1.json'
+data_path = '/home/jovyan/my_code/KG2RAG/test_hotpo/hotpo.json'
+
 with open(data_path) as f:
     data = json.load(f)
 
 triplets = {}
 llm = Ollama(model='llama3:8b',request_timeout=120)
-out_dir = '../../data/hotpotqa/kgs/extract_subkgs'
+# out_dir = '../../data/hotpotqa/kgs/extract_subkgs'
+
+out_dir = '/home/jovyan/my_code/KG2RAG/test_hotpo/kgs/extract_subkgs'
 count = 0
 
 for sample in tqdm(data):
