@@ -90,8 +90,10 @@ class NaivePostprocessor(BaseNodePostprocessor):
         return sorted_nodes
     
 class KGRetrievePostProcessor(BaseNodePostprocessor):
-
-    """KnowledgeGraph-based Node processor."""
+    """
+    继承BaseNodePostprocessor
+    直接找到与query相关的实体,然后找到与这些实体相关的文本
+    """
 
     dataset: str = Field
     ents: Set[str] = Field
@@ -101,15 +103,15 @@ class KGRetrievePostProcessor(BaseNodePostprocessor):
     @classmethod
     def class_name(cls) -> str:
         return "KGRetrievePostprocessor"
-
+    
     def _postprocess_nodes(
         self,
         nodes: List[NodeWithScore],
         query_bundle: Optional[QueryBundle] = None,
     ) -> List[NodeWithScore]:
-        """Postprocess nodes"""
-        top_k = len(nodes)
+        
 
+        top_k = len(nodes)
         retrieved_ids = set()
         retrieved_ents = set()
 
@@ -128,10 +130,6 @@ class KGRetrievePostProcessor(BaseNodePostprocessor):
             entity = node_id
             seq_str = node_id
             idx_str = node_id
-            # if self.dataset=='hotpotqa':
-            #     entity,seq_str = node_id.split('##')
-            # elif self.dataset=='musique':
-            #     idx_str,entity,seq_str = node_id.split('##')
 
             if (i<(top_k//2)) and (entity in retrieved_ents):
                 highly_related_ents.add(entity)
@@ -153,12 +151,7 @@ class KGRetrievePostProcessor(BaseNodePostprocessor):
             entity = node_id
             seq_str = node_id
             idx_seq_str = node_id
-            # if self.dataset=='hotpotqa':
-            #     entity,seq_str = node_id.split('##')
-            #     idx_seq_str = seq_str
-            # elif self.dataset=='musique':
-            #     idx_str,entity,seq_str = node_id.split('##')
-            #     idx_seq_str = f'{idx_str}##{seq_str}'
+
             if (entity not in self.doc2kg) or (idx_seq_str not in self.doc2kg[entity]):
                 continue
             for triplet in self.doc2kg[entity][idx_seq_str]:
@@ -180,6 +173,8 @@ class KGRetrievePostProcessor(BaseNodePostprocessor):
                     ent_score[t] += node.score
 
         additional_ents = additional_ents.union(retrieved_ents)
+        
+        # ----------------------多跳扩展----------------------
         hops = 1
         for hop in range(hops):
             related_ents = related_ents.union(additional_ents)
@@ -193,17 +188,12 @@ class KGRetrievePostProcessor(BaseNodePostprocessor):
                     if len(self.doc2kg[ent][idx_seq_str])==0:
                         continue
                     ctx_id = f'{ent}##{idx_seq_str}'
-                    # if self.dataset=='hotpotqa':
-                    #     ctx_id = f'{ent}##{idx_seq_str}'
-                    # elif self.dataset=='musique':
-                    #     idx_str,seq_str = idx_seq_str.split('##')
-                    #     ctx_id = f'{idx_str}##{ent}##{seq_str}'
                     if ctx_id in retrieved_ids:
                         continue
                     
                     for triplet in self.doc2kg[ent][idx_seq_str]:
+                        
                         h,r,t = triplet
-
                         if (h in self.ents) and (h not in related_ents):
                             additional_ents.add(h)
                             if h not in ent_count:
@@ -222,6 +212,7 @@ class KGRetrievePostProcessor(BaseNodePostprocessor):
         related_ents = related_ents.union(additional_ents)
         additional_ids = set()
 
+        # ----------------------添加相关实体的文本----------------------
         avg_score = float(sum([node.score for node in nodes])/len(nodes))
         retrieved_ents = retrieved_ents-highly_related_ents
         for ent in (related_ents-retrieved_ents):
@@ -229,11 +220,6 @@ class KGRetrievePostProcessor(BaseNodePostprocessor):
                 continue
             for idx_seq_str in self.chunks_index[ent]:
                 ctx_id = f'{ent}##{idx_seq_str}'
-                # if self.dataset=='hotpotqa':
-                #     ctx_id = f'{ent}##{idx_seq_str}'
-                # elif self.dataset=='musique':
-                #     idx_str,seq_str = idx_seq_str.split('##')
-                #     ctx_id = f'{idx_str}##{ent}##{seq_str}'
                 if ctx_id in retrieved_ids:
                     continue
                 additional_ids.add(ctx_id)
@@ -246,12 +232,6 @@ class KGRetrievePostProcessor(BaseNodePostprocessor):
             ent = ctx_id
             seq_str = ctx_id
             idx_seq_str = seq_str
-            # if self.dataset=='hotpotqa':
-            #     ent,seq_str = ctx_id.split('##')
-            #     idx_seq_str = seq_str
-            # elif self.dataset=='musique':
-            #     idx_str,ent,seq_str = ctx_id.split('##')
-            #     idx_seq_str = f'{idx_str}##{seq_str}'
             if ent in self.chunks_index:
                 if idx_seq_str in self.chunks_index[ent]:
                     ctx_text = self.chunks_index[ent][idx_seq_str]
